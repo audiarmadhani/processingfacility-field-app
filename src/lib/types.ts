@@ -39,6 +39,11 @@ export type PipelineBatch = {
   status?: string;
   roastCount?: number;
   cuppingCount?: number;
+  roastedAt?: string | null;
+};
+
+export type RoastPipelineBatch = PipelineBatch & {
+  roastPipelineStatus: "awaiting" | "roasted";
 };
 
 export type PipelineListsResponse = {

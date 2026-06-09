@@ -5,12 +5,15 @@ import { useSession } from "next-auth/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import axios from "axios";
 import { apiUrl } from "@/lib/api";
-import type { PipelineBatch, PipelineListsResponse } from "@/lib/types";
+import type { PipelineBatch, PipelineListsResponse, RoastPipelineBatch } from "@/lib/types";
 import { canAccessQc } from "@/lib/roles";
 import { loadCuppingSessionCounts } from "@/lib/cupping-counts";
 import {
   type CuppingSessionFilter,
+  type RoastPipelineFilter,
   filterCuppingBatchesBySessions,
+  filterRoastPipelineBatches,
+  mergeRoastPipelineBatches,
   sortPipelineByBatchNumber,
 } from "@/lib/qc";
 import { PipelineCard } from "@/components/qc/pipeline-card";
@@ -18,6 +21,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+
+const ROAST_PIPELINE_FILTERS: { value: RoastPipelineFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "awaiting", label: "Awaiting roast" },
+  { value: "roasted", label: "Roasted" },
+];
 
 const CUPPING_SESSION_FILTERS: { value: CuppingSessionFilter; label: string }[] = [
   { value: "all", label: "All" },
@@ -33,12 +42,13 @@ function QcPageContent() {
   const tabFromUrl = searchParams.get("tab") === "cupping" ? "cupping" : "roast";
 
   const [tab, setTab] = useState(tabFromUrl);
-  const [roastBatches, setRoastBatches] = useState<PipelineBatch[]>([]);
+  const [roastingBatches, setRoastingBatches] = useState<RoastPipelineBatch[]>([]);
   const [cuppingBatches, setCuppingBatches] = useState<PipelineBatch[]>([]);
   const [cuppingSessionCounts, setCuppingSessionCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [loadingCuppingCounts, setLoadingCuppingCounts] = useState(false);
   const [search, setSearch] = useState("");
+  const [roastPipelineFilter, setRoastPipelineFilter] = useState<RoastPipelineFilter>("all");
   const [cuppingSessionFilter, setCuppingSessionFilter] = useState<CuppingSessionFilter>("all");
 
   const allowed = canAccessQc(session?.user?.role);
@@ -47,16 +57,16 @@ function QcPageContent() {
     setLoading(true);
     try {
       const res = await axios.get<PipelineListsResponse>(apiUrl("/gb-qc/pipeline-lists"));
-      const roast = res.data.roast || [];
-      const cupping = res.data.readyForQc || [];
-      setRoastBatches(roast);
-      setCuppingBatches(cupping);
+      const awaitingRoast = res.data.roast || [];
+      const roasted = res.data.readyForQc || [];
+      setRoastingBatches(mergeRoastPipelineBatches(awaitingRoast, roasted));
+      setCuppingBatches(roasted);
 
       setLoadingCuppingCounts(true);
-      const counts = await loadCuppingSessionCounts(cupping.map((batch) => batch.batchNumber));
+      const counts = await loadCuppingSessionCounts(roasted.map((batch) => batch.batchNumber));
       setCuppingSessionCounts(counts);
     } catch {
-      setRoastBatches([]);
+      setRoastingBatches([]);
       setCuppingBatches([]);
       setCuppingSessionCounts({});
     } finally {
@@ -81,7 +91,9 @@ function QcPageContent() {
 
   const filterBatches = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return (items: PipelineBatch[]) => {
+    return <T extends { batchNumber: string; processingType: string; experimentNumber?: string | null }>(
+      items: T[]
+    ) => {
       if (!q) return items;
       return items.filter((batch) => {
         const haystack = [batch.batchNumber, batch.processingType, batch.experimentNumber]
@@ -93,10 +105,11 @@ function QcPageContent() {
     };
   }, [search]);
 
-  const filteredRoast = useMemo(
-    () => sortPipelineByBatchNumber(filterBatches(roastBatches)),
-    [filterBatches, roastBatches]
-  );
+  const filteredRoast = useMemo(() => {
+    const sorted = sortPipelineByBatchNumber(roastingBatches);
+    const byRoastStatus = filterRoastPipelineBatches(sorted, roastPipelineFilter);
+    return filterBatches(byRoastStatus);
+  }, [filterBatches, roastPipelineFilter, roastingBatches]);
   const filteredCupping = useMemo(() => {
     const sorted = sortPipelineByBatchNumber(cuppingBatches);
     const bySessions = filterCuppingBatchesBySessions(
@@ -126,18 +139,36 @@ function QcPageContent() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="roast">Awaiting roast ({roastBatches.length})</TabsTrigger>
+          <TabsTrigger value="roast">Roasting ({roastingBatches.length})</TabsTrigger>
           <TabsTrigger value="cupping">Cupping ({cuppingBatches.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="roast" className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {ROAST_PIPELINE_FILTERS.map((option) => (
+              <Button
+                key={option.value}
+                type="button"
+                variant={roastPipelineFilter === option.value ? "default" : "outline"}
+                size="default"
+                onClick={() => setRoastPipelineFilter(option.value)}
+              >
+                {option.label}
+              </Button>
+            ))}
+          </div>
+
           {loading ? (
             <>
               <Skeleton className="h-20 w-full" />
               <Skeleton className="h-20 w-full" />
             </>
           ) : filteredRoast.length === 0 ? (
-            <p className="text-sm text-stone-500">No batches awaiting roast.</p>
+            <p className="text-sm text-stone-500">
+              {roastPipelineFilter === "all"
+                ? "No batches in the roasting pipeline."
+                : "No batches match this roast filter."}
+            </p>
           ) : (
             filteredRoast.map((batch) => (
               <PipelineCard

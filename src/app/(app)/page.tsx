@@ -49,7 +49,7 @@ export default function HomePage() {
         requests.push(
           axios.get<PipelineListsResponse>(apiUrl("/gb-qc/pipeline-lists")).then((res) => {
             setQcCounts({
-              roast: res.data.roast?.length || 0,
+              roast: (res.data.roast?.length || 0) + (res.data.readyForQc?.length || 0),
               cupping: res.data.readyForQc?.length || 0,
             });
           })
@@ -172,7 +172,7 @@ export default function HomePage() {
             <Link href="/qc?tab=roast">
               <Card className="h-full active:scale-[0.99] transition-transform">
                 <CardContent className="flex h-full flex-col justify-between p-4">
-                  <p className="text-sm text-stone-500">Awaiting roast</p>
+                  <p className="text-sm text-stone-500">Roasting</p>
                   <p className="mt-2 text-3xl font-bold text-emerald-800">{qcCounts.roast}</p>
                 </CardContent>
               </Card>

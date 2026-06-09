@@ -2,11 +2,11 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { PipelineBatch } from "@/lib/types";
-import { resolveCuppingSessionCount } from "@/lib/qc";
+import type { PipelineBatch, RoastPipelineBatch } from "@/lib/types";
+import { normalizeRoastCount, resolveCuppingSessionCount } from "@/lib/qc";
 
 type PipelineCardProps = {
-  batch: PipelineBatch;
+  batch: PipelineBatch | RoastPipelineBatch;
   href: string;
   mode: "roast" | "cupping";
   cuppingSessionCounts?: Record<string, number>;
@@ -15,6 +15,8 @@ type PipelineCardProps = {
 export function PipelineCard({ batch, href, mode, cuppingSessionCounts = {} }: PipelineCardProps) {
   const cuppingCount =
     mode === "cupping" ? resolveCuppingSessionCount(batch, cuppingSessionCounts) : 0;
+  const roastBatch = batch as RoastPipelineBatch;
+  const roastCount = normalizeRoastCount(batch.roastCount);
   return (
     <Link href={href} className="block">
       <Card className="active:scale-[0.99] transition-transform">
@@ -27,6 +29,13 @@ export function PipelineCard({ batch, href, mode, cuppingSessionCounts = {} }: P
             <p className="mt-1 truncate text-sm text-stone-500">
               {batch.experimentNumber ? `Exp ${batch.experimentNumber}` : "—"}
             </p>
+            {mode === "roast" ? (
+              <p className="mt-1 text-xs text-stone-500">
+                {roastBatch.roastPipelineStatus === "roasted"
+                  ? `${roastCount} roast${roastCount === 1 ? "" : "s"} recorded`
+                  : "Awaiting roast"}
+              </p>
+            ) : null}
             {mode === "cupping" ? (
               <p className="mt-1 text-xs text-stone-500">
                 {cuppingCount} cupping session{cuppingCount === 1 ? "" : "s"}

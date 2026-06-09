@@ -1,6 +1,7 @@
-import type { CuppingEntry, PipelineBatch } from "@/lib/types";
+import type { CuppingEntry, PipelineBatch, RoastPipelineBatch } from "@/lib/types";
 
 export type CuppingSessionFilter = "all" | "no_sessions" | "has_sessions";
+export type RoastPipelineFilter = "all" | "awaiting" | "roasted";
 
 export const ROAST_PROFILES = ["Light", "Medium-Light", "Medium", "Medium-Dark", "Dark"] as const;
 
@@ -123,6 +124,34 @@ export function resolveCuppingSessionCount(
     return sessionCounts[batch.batchNumber];
   }
   return normalizeCuppingCount(batch.cuppingCount);
+}
+
+export function mergeRoastPipelineBatches(
+  awaiting: PipelineBatch[],
+  roasted: PipelineBatch[]
+): RoastPipelineBatch[] {
+  return [
+    ...awaiting.map((batch) => ({ ...batch, roastPipelineStatus: "awaiting" as const })),
+    ...roasted.map((batch) => ({ ...batch, roastPipelineStatus: "roasted" as const })),
+  ];
+}
+
+export function filterRoastPipelineBatches(
+  batches: RoastPipelineBatch[],
+  roastFilter: RoastPipelineFilter
+) {
+  if (roastFilter === "all") {
+    return batches;
+  }
+  if (roastFilter === "awaiting") {
+    return batches.filter((batch) => batch.roastPipelineStatus === "awaiting");
+  }
+  return batches.filter((batch) => batch.roastPipelineStatus === "roasted");
+}
+
+export function normalizeRoastCount(value: unknown) {
+  const count = Number(value);
+  return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
 }
 
 export function filterCuppingBatchesBySessions(
