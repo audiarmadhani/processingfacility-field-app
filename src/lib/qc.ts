@@ -110,15 +110,35 @@ export function sortPipelineByBatchNumber<T extends { batchNumber: string }>(bat
   return [...batches].sort((a, b) => compareBatchNumbers(a.batchNumber, b.batchNumber));
 }
 
+export function normalizeCuppingCount(value: unknown) {
+  const count = Number(value);
+  return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+}
+
+export function resolveCuppingSessionCount(
+  batch: PipelineBatch,
+  sessionCounts: Record<string, number>
+) {
+  if (Object.prototype.hasOwnProperty.call(sessionCounts, batch.batchNumber)) {
+    return sessionCounts[batch.batchNumber];
+  }
+  return normalizeCuppingCount(batch.cuppingCount);
+}
+
 export function filterCuppingBatchesBySessions(
   batches: PipelineBatch[],
-  sessionFilter: CuppingSessionFilter
+  sessionFilter: CuppingSessionFilter,
+  sessionCounts: Record<string, number> = {}
 ) {
   if (sessionFilter === "all") {
     return batches;
   }
-  if (sessionFilter === "no_sessions") {
-    return batches.filter((batch) => !batch.cuppingCount || batch.cuppingCount === 0);
-  }
-  return batches.filter((batch) => (batch.cuppingCount ?? 0) > 0);
+
+  return batches.filter((batch) => {
+    const count = resolveCuppingSessionCount(batch, sessionCounts);
+    if (sessionFilter === "no_sessions") {
+      return count === 0;
+    }
+    return count > 0;
+  });
 }

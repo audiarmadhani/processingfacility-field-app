@@ -134,6 +134,7 @@ function CuppingPageContent() {
       });
       toast.success("Cupping saved.");
       router.push("/qc?tab=cupping");
+      router.refresh();
     } catch {
       toast.error("Failed to save cupping.");
     } finally {

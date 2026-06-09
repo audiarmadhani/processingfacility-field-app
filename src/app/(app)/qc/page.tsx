@@ -2,11 +2,12 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import axios from "axios";
 import { apiUrl } from "@/lib/api";
 import type { PipelineBatch, PipelineListsResponse } from "@/lib/types";
 import { canAccessQc } from "@/lib/roles";
+import { loadCuppingSessionCounts } from "@/lib/cupping-counts";
 import {
   type CuppingSessionFilter,
   filterCuppingBatchesBySessions,
@@ -27,30 +28,46 @@ const CUPPING_SESSION_FILTERS: { value: CuppingSessionFilter; label: string }[] 
 function QcPageContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const initialTab = searchParams.get("tab") === "cupping" ? "cupping" : "roast";
+  const tabFromUrl = searchParams.get("tab") === "cupping" ? "cupping" : "roast";
 
-  const [tab, setTab] = useState(initialTab);
+  const [tab, setTab] = useState(tabFromUrl);
   const [roastBatches, setRoastBatches] = useState<PipelineBatch[]>([]);
   const [cuppingBatches, setCuppingBatches] = useState<PipelineBatch[]>([]);
+  const [cuppingSessionCounts, setCuppingSessionCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [loadingCuppingCounts, setLoadingCuppingCounts] = useState(false);
   const [search, setSearch] = useState("");
   const [cuppingSessionFilter, setCuppingSessionFilter] = useState<CuppingSessionFilter>("all");
 
   const allowed = canAccessQc(session?.user?.role);
 
   const loadPipeline = useCallback(async () => {
+    setLoading(true);
     try {
       const res = await axios.get<PipelineListsResponse>(apiUrl("/gb-qc/pipeline-lists"));
-      setRoastBatches(res.data.roast || []);
-      setCuppingBatches(res.data.readyForQc || []);
+      const roast = res.data.roast || [];
+      const cupping = res.data.readyForQc || [];
+      setRoastBatches(roast);
+      setCuppingBatches(cupping);
+
+      setLoadingCuppingCounts(true);
+      const counts = await loadCuppingSessionCounts(cupping.map((batch) => batch.batchNumber));
+      setCuppingSessionCounts(counts);
     } catch {
       setRoastBatches([]);
       setCuppingBatches([]);
+      setCuppingSessionCounts({});
     } finally {
       setLoading(false);
+      setLoadingCuppingCounts(false);
     }
   }, []);
+
+  useEffect(() => {
+    setTab(tabFromUrl);
+  }, [tabFromUrl]);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -58,8 +75,9 @@ function QcPageContent() {
       router.replace("/");
       return;
     }
+    if (pathname !== "/qc") return;
     loadPipeline();
-  }, [allowed, loadPipeline, router, status]);
+  }, [allowed, loadPipeline, pathname, router, status]);
 
   const filterBatches = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -81,9 +99,13 @@ function QcPageContent() {
   );
   const filteredCupping = useMemo(() => {
     const sorted = sortPipelineByBatchNumber(cuppingBatches);
-    const bySessions = filterCuppingBatchesBySessions(sorted, cuppingSessionFilter);
+    const bySessions = filterCuppingBatchesBySessions(
+      sorted,
+      cuppingSessionFilter,
+      cuppingSessionCounts
+    );
     return filterBatches(bySessions);
-  }, [cuppingBatches, cuppingSessionFilter, filterBatches]);
+  }, [cuppingBatches, cuppingSessionCounts, cuppingSessionFilter, filterBatches]);
 
   if (!allowed && status !== "loading") {
     return null;
@@ -143,6 +165,10 @@ function QcPageContent() {
             ))}
           </div>
 
+          {loadingCuppingCounts ? (
+            <p className="text-sm text-stone-500">Refreshing cupping session counts…</p>
+          ) : null}
+
           {loading ? (
             <>
               <Skeleton className="h-20 w-full" />
@@ -160,6 +186,7 @@ function QcPageContent() {
                 key={`${batch.batchNumber}-${batch.processingType}`}
                 batch={batch}
                 mode="cupping"
+                cuppingSessionCounts={cuppingSessionCounts}
                 href={`/qc/cupping/${encodeURIComponent(batch.batchNumber)}?processingType=${encodeURIComponent(batch.processingType)}`}
               />
             ))

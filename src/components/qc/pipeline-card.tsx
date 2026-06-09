@@ -3,14 +3,18 @@ import { ChevronRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { PipelineBatch } from "@/lib/types";
+import { resolveCuppingSessionCount } from "@/lib/qc";
 
 type PipelineCardProps = {
   batch: PipelineBatch;
   href: string;
   mode: "roast" | "cupping";
+  cuppingSessionCounts?: Record<string, number>;
 };
 
-export function PipelineCard({ batch, href, mode }: PipelineCardProps) {
+export function PipelineCard({ batch, href, mode, cuppingSessionCounts = {} }: PipelineCardProps) {
+  const cuppingCount =
+    mode === "cupping" ? resolveCuppingSessionCount(batch, cuppingSessionCounts) : 0;
   return (
     <Link href={href} className="block">
       <Card className="active:scale-[0.99] transition-transform">
@@ -23,8 +27,10 @@ export function PipelineCard({ batch, href, mode }: PipelineCardProps) {
             <p className="mt-1 truncate text-sm text-stone-500">
               {batch.experimentNumber ? `Exp ${batch.experimentNumber}` : "—"}
             </p>
-            {mode === "cupping" && batch.cuppingCount != null ? (
-              <p className="mt-1 text-xs text-stone-500">{batch.cuppingCount} cupping session(s)</p>
+            {mode === "cupping" ? (
+              <p className="mt-1 text-xs text-stone-500">
+                {cuppingCount} cupping session{cuppingCount === 1 ? "" : "s"}
+              </p>
             ) : null}
           </div>
           <ChevronRight className="h-5 w-5 shrink-0 text-stone-400" />
