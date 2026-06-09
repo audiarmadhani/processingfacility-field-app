@@ -103,6 +103,34 @@ export function periodLabel(period?: string | null) {
   return "Outside window";
 }
 
+export function matchesPipelineSearch(
+  batch: {
+    batchNumber: string;
+    experimentNumber?: string | number | null;
+    processingType?: string | null;
+  },
+  query: string
+) {
+  const q = query.trim().toLowerCase();
+  if (!q) {
+    return true;
+  }
+
+  const batchNumber = String(batch.batchNumber || "").toLowerCase();
+  const experiment = String(batch.experimentNumber ?? "").toLowerCase();
+  const processingType = String(batch.processingType || "").toLowerCase();
+  const experimentQuery = q.replace(/^exp\s*/i, "").trim();
+
+  return (
+    batchNumber.includes(q) ||
+    (experiment !== "" &&
+      (experiment.includes(experimentQuery) ||
+        experiment.includes(q) ||
+        `exp ${experiment}`.includes(q))) ||
+    processingType.includes(q)
+  );
+}
+
 export function compareBatchNumbers(a: string, b: string) {
   return a.localeCompare(b, undefined, { numeric: true });
 }

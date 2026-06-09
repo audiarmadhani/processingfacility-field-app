@@ -13,12 +13,13 @@ import {
   type RoastPipelineFilter,
   filterCuppingBatchesBySessions,
   filterRoastPipelineBatches,
+  matchesPipelineSearch,
   mergeRoastPipelineBatches,
   sortPipelineByBatchNumber,
 } from "@/lib/qc";
+import { BatchSearchBar } from "@/components/qc/batch-search-bar";
 import { PipelineCard } from "@/components/qc/pipeline-card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -47,7 +48,8 @@ function QcPageContent() {
   const [cuppingSessionCounts, setCuppingSessionCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [loadingCuppingCounts, setLoadingCuppingCounts] = useState(false);
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [roastPipelineFilter, setRoastPipelineFilter] = useState<RoastPipelineFilter>("all");
   const [cuppingSessionFilter, setCuppingSessionFilter] = useState<CuppingSessionFilter>("all");
 
@@ -89,27 +91,24 @@ function QcPageContent() {
     loadPipeline();
   }, [allowed, loadPipeline, pathname, router, status]);
 
-  const filterBatches = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return <T extends { batchNumber: string; processingType: string; experimentNumber?: string | null }>(
+  const filterBySearch = useCallback(
+    <T extends { batchNumber: string; processingType: string; experimentNumber?: string | number | null }>(
       items: T[]
     ) => {
-      if (!q) return items;
-      return items.filter((batch) => {
-        const haystack = [batch.batchNumber, batch.processingType, batch.experimentNumber]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-        return haystack.includes(q);
-      });
-    };
-  }, [search]);
+      if (!appliedSearch) {
+        return items;
+      }
+      return items.filter((batch) => matchesPipelineSearch(batch, appliedSearch));
+    },
+    [appliedSearch]
+  );
 
   const filteredRoast = useMemo(() => {
     const sorted = sortPipelineByBatchNumber(roastingBatches);
     const byRoastStatus = filterRoastPipelineBatches(sorted, roastPipelineFilter);
-    return filterBatches(byRoastStatus);
-  }, [filterBatches, roastPipelineFilter, roastingBatches]);
+    return filterBySearch(byRoastStatus);
+  }, [filterBySearch, roastPipelineFilter, roastingBatches]);
+
   const filteredCupping = useMemo(() => {
     const sorted = sortPipelineByBatchNumber(cuppingBatches);
     const bySessions = filterCuppingBatchesBySessions(
@@ -117,8 +116,8 @@ function QcPageContent() {
       cuppingSessionFilter,
       cuppingSessionCounts
     );
-    return filterBatches(bySessions);
-  }, [cuppingBatches, cuppingSessionCounts, cuppingSessionFilter, filterBatches]);
+    return filterBySearch(bySessions);
+  }, [cuppingBatches, cuppingSessionCounts, cuppingSessionFilter, filterBySearch]);
 
   if (!allowed && status !== "loading") {
     return null;
@@ -131,10 +130,11 @@ function QcPageContent() {
         <p className="mt-1 text-sm text-stone-500">Roast and cupping capture</p>
       </div>
 
-      <Input
-        placeholder="Search batch, experiment…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
+      <BatchSearchBar
+        value={searchInput}
+        onChange={setSearchInput}
+        onSearch={setAppliedSearch}
+        placeholder="Search batch or experiment…"
       />
 
       <Tabs value={tab} onValueChange={setTab}>
@@ -165,9 +165,11 @@ function QcPageContent() {
             </>
           ) : filteredRoast.length === 0 ? (
             <p className="text-sm text-stone-500">
-              {roastPipelineFilter === "all"
-                ? "No batches in the roasting pipeline."
-                : "No batches match this roast filter."}
+              {appliedSearch
+                ? `No roasting batches match "${appliedSearch}".`
+                : roastPipelineFilter === "all"
+                  ? "No batches in the roasting pipeline."
+                  : "No batches match this roast filter."}
             </p>
           ) : (
             filteredRoast.map((batch) => (
@@ -207,9 +209,11 @@ function QcPageContent() {
             </>
           ) : filteredCupping.length === 0 ? (
             <p className="text-sm text-stone-500">
-              {cuppingSessionFilter === "all"
-                ? "No batches ready for cupping."
-                : "No batches match this cupping session filter."}
+              {appliedSearch
+                ? `No cupping batches match "${appliedSearch}".`
+                : cuppingSessionFilter === "all"
+                  ? "No batches ready for cupping."
+                  : "No batches match this cupping session filter."}
             </p>
           ) : (
             filteredCupping.map((batch) => (

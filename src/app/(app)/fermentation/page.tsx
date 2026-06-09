@@ -8,7 +8,8 @@ import { apiUrl } from "@/lib/api";
 import type { FermentationBatch } from "@/lib/types";
 import { canAccessFermentation } from "@/lib/roles";
 import { BatchCard } from "@/components/fermentation/batch-card";
-import { Input } from "@/components/ui/input";
+import { BatchSearchBar } from "@/components/qc/batch-search-bar";
+import { matchesPipelineSearch } from "@/lib/qc";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function FermentationPage() {
@@ -16,7 +17,8 @@ export default function FermentationPage() {
   const router = useRouter();
   const [batches, setBatches] = useState<FermentationBatch[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
 
   const allowed = canAccessFermentation(session?.user?.role);
 
@@ -61,22 +63,29 @@ export default function FermentationPage() {
   }, [allowed, loadBatches, router, status]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return batches;
+    if (!appliedSearch) {
+      return batches;
+    }
     return batches.filter((batch) => {
-      const haystack = [
-        batch.batchNumber,
-        batch.experimentNumber,
-        batch.referenceNumber,
-        batch.tank,
-        ...(batch.tanks || []),
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(q);
+      if (!batch.batchNumber) {
+        return false;
+      }
+      return (
+        matchesPipelineSearch(
+          {
+            batchNumber: batch.batchNumber,
+            experimentNumber: batch.experimentNumber,
+          },
+          appliedSearch
+        ) ||
+        [batch.referenceNumber, batch.tank, ...(batch.tanks || [])]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(appliedSearch.toLowerCase())
+      );
     });
-  }, [batches, search]);
+  }, [appliedSearch, batches]);
 
   if (!allowed && status !== "loading") {
     return null;
@@ -89,10 +98,11 @@ export default function FermentationPage() {
         <p className="mt-1 text-sm text-stone-500">In-progress batches</p>
       </div>
 
-      <Input
-        placeholder="Search batch, tank, experiment…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
+      <BatchSearchBar
+        value={searchInput}
+        onChange={setSearchInput}
+        onSearch={setAppliedSearch}
+        placeholder="Search batch or experiment…"
       />
 
       {loading ? (
@@ -101,7 +111,11 @@ export default function FermentationPage() {
           <Skeleton className="h-20 w-full" />
         </div>
       ) : filtered.length === 0 ? (
-        <p className="text-sm text-stone-500">No in-progress batches found.</p>
+        <p className="text-sm text-stone-500">
+          {appliedSearch
+            ? `No batches match "${appliedSearch}".`
+            : "No in-progress batches found."}
+        </p>
       ) : (
         <div className="space-y-3">
           {filtered.map((batch) => (
