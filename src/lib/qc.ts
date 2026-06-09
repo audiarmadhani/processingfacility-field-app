@@ -3,8 +3,6 @@ import type { CuppingEntry, PipelineBatch, RoastPipelineBatch } from "@/lib/type
 export type CuppingSessionFilter = "all" | "no_sessions" | "has_sessions";
 export type RoastPipelineFilter = "all" | "awaiting" | "roasted";
 
-export const ROAST_PROFILES = ["Light", "Medium-Light", "Medium", "Medium-Dark", "Dark"] as const;
-
 export function toDatetimeLocalValue(date = new Date()) {
   const d = new Date(date);
   const pad = (n: number) => String(n).padStart(2, "0");

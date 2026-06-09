@@ -10,7 +10,7 @@ import { ArrowLeft } from "lucide-react";
 import { apiUrl } from "@/lib/api";
 import type { RoastRecord } from "@/lib/types";
 import { canAccessQc } from "@/lib/roles";
-import { ROAST_PROFILES, toDatetimeLocalValue } from "@/lib/qc";
+import { toDatetimeLocalValue } from "@/lib/qc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -141,21 +141,9 @@ function RecordRoastPageContent() {
 
         <div className="space-y-2">
           <Label htmlFor="roastProfile">Roast profile</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {ROAST_PROFILES.map((profile) => (
-              <Button
-                key={profile}
-                type="button"
-                variant={roastProfile === profile ? "default" : "outline"}
-                onClick={() => setRoastProfile(profile)}
-              >
-                {profile}
-              </Button>
-            ))}
-          </div>
           <Input
             id="roastProfile"
-            placeholder="Or type custom profile"
+            placeholder="e.g. Medium"
             value={roastProfile}
             onChange={(e) => setRoastProfile(e.target.value)}
           />
