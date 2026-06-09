@@ -4,8 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { RefreshCw } from "lucide-react";
-import axios from "axios";
+import { toast } from "sonner";
+import { getApiErrorMessage } from "@/lib/fetch-api";
 import { apiUrl } from "@/lib/api";
+import axios from "axios";
 import type { PendingCheckInsResponse, PipelineListsResponse } from "@/lib/types";
 import { canAccessFermentation, canAccessQc } from "@/lib/roles";
 import { periodLabel } from "@/lib/qc";
@@ -16,7 +18,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function HomePage() {
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const role = session?.user?.role;
   const showFermentation = canAccessFermentation(role);
   const showQc = canAccessQc(role);
@@ -25,9 +27,14 @@ export default function HomePage() {
   const [qcCounts, setQcCounts] = useState({ roast: 0, cupping: 0 });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
+    if (sessionStatus !== "authenticated") {
+      return;
+    }
     try {
+      setApiError(null);
       const requests: Promise<void>[] = [];
 
       if (showFermentation) {
@@ -50,17 +57,28 @@ export default function HomePage() {
       }
 
       await Promise.all(requests);
-    } catch {
+    } catch (error) {
       setPendingData(null);
+      const message = getApiErrorMessage(error, "Failed to load data from the platform API.");
+      setApiError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [showFermentation, showQc]);
+  }, [sessionStatus, showFermentation, showQc]);
 
   useEffect(() => {
+    if (sessionStatus === "loading") {
+      return;
+    }
+    if (sessionStatus === "unauthenticated") {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     loadData();
-  }, [loadData]);
+  }, [loadData, sessionStatus]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -171,7 +189,20 @@ export default function HomePage() {
         </section>
       ) : null}
 
-      {!showFermentation && !showQc ? (
+      {apiError ? (
+        <Card className="border-amber-300 bg-amber-50">
+          <CardContent className="p-4 text-sm text-amber-900">
+            <p className="font-semibold">Could not load data</p>
+            <p className="mt-1">{apiError}</p>
+            <p className="mt-2 text-xs text-amber-800">
+              This app reads data through the platform API (Render), which uses your Supabase Postgres
+              database. It does not connect to Supabase directly.
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {sessionStatus === "authenticated" && !showFermentation && !showQc ? (
         <Card>
           <CardContent className="p-4 text-sm text-stone-500">
             Your account does not have access to field workflows. Contact an administrator.

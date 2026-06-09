@@ -13,13 +13,17 @@
 
 ## Render (backend CORS)
 
-On the platform backend service, add:
+The production Vercel URL is already allowlisted in the platform backend:
+
+`https://processing-facility-field-app.vercel.app`
+
+After pulling the latest platform backend, **redeploy Render** so CORS changes take effect.
+
+For preview deployments, also set on Render:
 
 ```
-FIELD_APP_ORIGIN=https://your-field-app.vercel.app
+FIELD_APP_ORIGIN=https://your-preview-url.vercel.app
 ```
-
-Redeploy the backend after saving.
 
 ## Verify on mobile
 

@@ -4,6 +4,18 @@ Mobile-first field app for fermentation daily check-ins and GB QC roast/cupping 
 
 **Repository:** [github.com/audiarmadhani/processingfacility-field-app](https://github.com/audiarmadhani/processingfacility-field-app)
 
+## How it connects to data
+
+This app does **not** use the Supabase JavaScript client directly (unlike the driver app for some features).
+
+```
+BTM Field PWA  →  Express API (Render)  →  PostgreSQL (Supabase)
+```
+
+- **Auth:** `POST /api/login` on the platform backend (users table in Postgres)
+- **Data:** fermentation, roast, cupping endpoints on the same backend
+- **Env:** only `NEXT_PUBLIC_API_BASE_URL` is required — point it at Render, not Supabase
+
 ## Features
 
 - Home screen with pending/overdue fermentation check-ins
