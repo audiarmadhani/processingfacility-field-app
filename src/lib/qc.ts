@@ -1,4 +1,6 @@
-import type { CuppingEntry } from "@/lib/types";
+import type { CuppingEntry, PipelineBatch } from "@/lib/types";
+
+export type CuppingSessionFilter = "all" | "no_sessions" | "has_sessions";
 
 export const ROAST_PROFILES = ["Light", "Medium-Light", "Medium", "Medium-Dark", "Dark"] as const;
 
@@ -98,4 +100,25 @@ export function periodLabel(period?: string | null) {
   if (period === "evening") return "Evening";
   if (period === "morning") return "Morning";
   return "Outside window";
+}
+
+export function compareBatchNumbers(a: string, b: string) {
+  return a.localeCompare(b, undefined, { numeric: true });
+}
+
+export function sortPipelineByBatchNumber<T extends { batchNumber: string }>(batches: T[]) {
+  return [...batches].sort((a, b) => compareBatchNumbers(a.batchNumber, b.batchNumber));
+}
+
+export function filterCuppingBatchesBySessions(
+  batches: PipelineBatch[],
+  sessionFilter: CuppingSessionFilter
+) {
+  if (sessionFilter === "all") {
+    return batches;
+  }
+  if (sessionFilter === "no_sessions") {
+    return batches.filter((batch) => !batch.cuppingCount || batch.cuppingCount === 0);
+  }
+  return batches.filter((batch) => (batch.cuppingCount ?? 0) > 0);
 }

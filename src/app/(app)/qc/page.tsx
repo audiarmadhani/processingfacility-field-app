@@ -7,10 +7,22 @@ import axios from "axios";
 import { apiUrl } from "@/lib/api";
 import type { PipelineBatch, PipelineListsResponse } from "@/lib/types";
 import { canAccessQc } from "@/lib/roles";
+import {
+  type CuppingSessionFilter,
+  filterCuppingBatchesBySessions,
+  sortPipelineByBatchNumber,
+} from "@/lib/qc";
 import { PipelineCard } from "@/components/qc/pipeline-card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+
+const CUPPING_SESSION_FILTERS: { value: CuppingSessionFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "no_sessions", label: "No sessions" },
+  { value: "has_sessions", label: "Has sessions" },
+];
 
 function QcPageContent() {
   const { data: session, status } = useSession();
@@ -23,6 +35,7 @@ function QcPageContent() {
   const [cuppingBatches, setCuppingBatches] = useState<PipelineBatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [cuppingSessionFilter, setCuppingSessionFilter] = useState<CuppingSessionFilter>("all");
 
   const allowed = canAccessQc(session?.user?.role);
 
@@ -62,8 +75,15 @@ function QcPageContent() {
     };
   }, [search]);
 
-  const filteredRoast = useMemo(() => filterBatches(roastBatches), [filterBatches, roastBatches]);
-  const filteredCupping = useMemo(() => filterBatches(cuppingBatches), [filterBatches, cuppingBatches]);
+  const filteredRoast = useMemo(
+    () => sortPipelineByBatchNumber(filterBatches(roastBatches)),
+    [filterBatches, roastBatches]
+  );
+  const filteredCupping = useMemo(() => {
+    const sorted = sortPipelineByBatchNumber(cuppingBatches);
+    const bySessions = filterCuppingBatchesBySessions(sorted, cuppingSessionFilter);
+    return filterBatches(bySessions);
+  }, [cuppingBatches, cuppingSessionFilter, filterBatches]);
 
   if (!allowed && status !== "loading") {
     return null;
@@ -109,13 +129,31 @@ function QcPageContent() {
         </TabsContent>
 
         <TabsContent value="cupping" className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {CUPPING_SESSION_FILTERS.map((option) => (
+              <Button
+                key={option.value}
+                type="button"
+                variant={cuppingSessionFilter === option.value ? "default" : "outline"}
+                size="default"
+                onClick={() => setCuppingSessionFilter(option.value)}
+              >
+                {option.label}
+              </Button>
+            ))}
+          </div>
+
           {loading ? (
             <>
               <Skeleton className="h-20 w-full" />
               <Skeleton className="h-20 w-full" />
             </>
           ) : filteredCupping.length === 0 ? (
-            <p className="text-sm text-stone-500">No batches ready for cupping.</p>
+            <p className="text-sm text-stone-500">
+              {cuppingSessionFilter === "all"
+                ? "No batches ready for cupping."
+                : "No batches match this cupping session filter."}
+            </p>
           ) : (
             filteredCupping.map((batch) => (
               <PipelineCard
