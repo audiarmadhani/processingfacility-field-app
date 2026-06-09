@@ -3,20 +3,19 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import Webcam from "react-webcam";
 import axios from "axios";
 import dayjs from "dayjs";
 import { toast } from "sonner";
-import { ArrowLeft, Camera, ImagePlus } from "lucide-react";
+import { ArrowLeft, Camera, ImagePlus, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { apiUrl } from "@/lib/api";
 import type { CheckInRecord, FermentationBatch } from "@/lib/types";
 import { canAccessFermentation } from "@/lib/roles";
+import { loadStoredCheckInPhoto } from "@/lib/check-in-photo";
 import { formatTankLabel, periodLabel } from "@/lib/qc";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -28,20 +27,35 @@ function CheckInPageContent() {
   const fermentationId = Number(params.id);
   const periodParam = searchParams.get("period") as "morning" | "evening" | null;
 
-  const webcamRef = useRef<Webcam>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [batch, setBatch] = useState<FermentationBatch | null>(null);
   const [activePeriod, setActivePeriod] = useState<"morning" | "evening" | null>(periodParam);
   const [todayCheckIns, setTodayCheckIns] = useState<CheckInRecord[]>([]);
   const [notes, setNotes] = useState("");
-  const [tab, setTab] = useState("camera");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   const allowed = canAccessFermentation(session?.user?.role);
+
+  const checkInQuery = periodParam ? `?period=${periodParam}` : "";
+  const cameraHref = `/fermentation/${fermentationId}/check-in/camera${checkInQuery}`;
+
+  const applyCapturedPhoto = useCallback(async () => {
+    if (!Number.isFinite(fermentationId)) {
+      return;
+    }
+
+    const captured = await loadStoredCheckInPhoto(fermentationId);
+    if (!captured) {
+      return;
+    }
+
+    setSelectedFile(captured.file);
+    setPreviewUrl(captured.previewUrl);
+  }, [fermentationId]);
 
   const loadData = useCallback(async () => {
     try {
@@ -89,14 +103,44 @@ function CheckInPageContent() {
     loadData();
   }, [allowed, fermentationId, loadData, router, status]);
 
+  useEffect(() => {
+    void applyCapturedPhoto();
+  }, [applyCapturedPhoto]);
+
+  useEffect(() => {
+    const handleFocus = () => {
+      void applyCapturedPhoto();
+    };
+
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [applyCapturedPhoto]);
+
+  const clearPhoto = () => {
+    if (previewUrl?.startsWith("blob:")) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    setPreviewUrl(null);
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    clearPhoto();
     setSelectedFile(file);
     setPreviewUrl(URL.createObjectURL(file));
   };
 
-  const submitCheckIn = async (imageFile: File) => {
+  const submitCheckIn = async () => {
+    if (!selectedFile) {
+      toast.error("Add a tank photo before submitting.");
+      return;
+    }
+
     if (!batch?.id || !session?.user?.name) {
       toast.error("Missing session or batch data.");
       return;
@@ -112,7 +156,7 @@ function CheckInPageContent() {
     setSubmitting(true);
     try {
       const formData = new FormData();
-      formData.append("file", imageFile);
+      formData.append("file", selectedFile);
       formData.append("batchNumber", batch.batchNumber || "");
       formData.append("module", "Fermentation-CheckIn");
 
@@ -145,25 +189,11 @@ function CheckInPageContent() {
     }
   };
 
-  const handleSubmitCamera = async () => {
-    const imageSrc = webcamRef.current?.getScreenshot();
-    if (!imageSrc) {
-      toast.error("Could not capture photo. Try again or upload from gallery.");
-      return;
-    }
-    const blob = await fetch(imageSrc).then((res) => res.blob());
-    const file = new File([blob], `checkin_${Date.now()}.jpg`, { type: "image/jpeg" });
-    await submitCheckIn(file);
-  };
-
-  const handleSubmitFile = async () => {
-    if (!selectedFile) return;
-    await submitCheckIn(selectedFile);
-  };
-
   if (!allowed && status !== "loading") {
     return null;
   }
+
+  const hasPhoto = Boolean(selectedFile && previewUrl);
 
   return (
     <div className="space-y-4">
@@ -212,84 +242,79 @@ function CheckInPageContent() {
             />
           </div>
 
-          <Tabs value={tab} onValueChange={setTab}>
-            <TabsList>
-              <TabsTrigger value="camera">
-                <Camera className="mr-1 h-4 w-4" />
-                Camera
-              </TabsTrigger>
-              <TabsTrigger value="upload">
-                <ImagePlus className="mr-1 h-4 w-4" />
-                Upload
-              </TabsTrigger>
-            </TabsList>
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-stone-700">Tank photo (required)</p>
 
-            <TabsContent value="camera">
+            {hasPhoto ? (
               <Card>
-                <CardContent className="overflow-hidden rounded-xl p-0">
-                  <Webcam
-                    audio={false}
-                    ref={webcamRef}
-                    screenshotFormat="image/jpeg"
-                    videoConstraints={{
-                      width: 1280,
-                      height: 720,
-                      facingMode: { ideal: "environment" },
-                    }}
-                    className="w-full"
+                <CardContent className="space-y-3 p-4">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={previewUrl!}
+                    alt="Captured tank"
+                    className="max-h-80 w-full rounded-xl object-contain"
                   />
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button type="button" variant="outline" size="lg" asChild>
+                      <Link href={cameraHref}>
+                        <RotateCcw className="mr-2 h-5 w-5" />
+                        Retake
+                      </Link>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="lg"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={submitting}
+                    >
+                      <ImagePlus className="mr-2 h-5 w-5" />
+                      Replace
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
-            </TabsContent>
-
-            <TabsContent value="upload">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={submitting}
-              >
-                Choose image
-              </Button>
-              {previewUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={previewUrl} alt="Preview" className="mt-3 max-h-80 w-full rounded-xl object-contain" />
-              ) : (
-                <p className="mt-3 text-sm text-stone-500">Select a JPEG or PNG photo of the tank.</p>
-              )}
-            </TabsContent>
-          </Tabs>
+            ) : (
+              <div className="space-y-2">
+                <Button type="button" className="w-full" size="lg" asChild>
+                  <Link href={cameraHref}>
+                    <Camera className="mr-2 h-5 w-5" />
+                    Open camera
+                  </Link>
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  size="lg"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={submitting}
+                >
+                  <ImagePlus className="mr-2 h-5 w-5" />
+                  Upload from gallery
+                </Button>
+              </div>
+            )}
+          </div>
         </>
       )}
 
       <div className="sticky bottom-24">
-        {tab === "camera" ? (
-          <Button
-            className="w-full"
-            size="lg"
-            disabled={submitting || loading || !activePeriod}
-            onClick={handleSubmitCamera}
-          >
-            {submitting ? "Saving…" : "Submit check-in"}
-          </Button>
-        ) : (
-          <Button
-            className="w-full"
-            size="lg"
-            disabled={submitting || loading || !selectedFile || !activePeriod}
-            onClick={handleSubmitFile}
-          >
-            {submitting ? "Saving…" : "Submit check-in"}
-          </Button>
-        )}
+        <Button
+          className="w-full"
+          size="lg"
+          disabled={submitting || loading || !hasPhoto || !activePeriod}
+          onClick={submitCheckIn}
+        >
+          {submitting ? "Saving…" : "Submit check-in"}
+        </Button>
       </div>
     </div>
   );
