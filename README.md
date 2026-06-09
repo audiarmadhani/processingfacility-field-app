@@ -2,6 +2,8 @@
 
 Mobile-first field app for fermentation daily check-ins and GB QC roast/cupping capture (BTM HEQA platform).
 
+**Repository:** [github.com/audiarmadhani/processingfacility-field-app](https://github.com/audiarmadhani/processingfacility-field-app)
+
 ## Features
 
 - Home screen with pending/overdue fermentation check-ins

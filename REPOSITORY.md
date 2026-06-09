@@ -1,16 +1,16 @@
 # Separate repository
 
-This app is intended to live in its own GitHub repository, e.g. `processing-facility-field-app`, following the same pattern as `processing-facility-driver-app`.
+This app lives in its own GitHub repository:
 
-To publish:
+**https://github.com/audiarmadhani/processingfacility-field-app**
+
+Clone and develop from that repo (not from `field-app/` in the platform monorepo unless syncing changes).
 
 ```bash
-cd field-app
-git init
-git remote add origin git@github.com:audiarmadhani/processing-facility-field-app.git
-git add .
-git commit -m "Initial BTM Field PWA"
-git push -u origin main
+git clone https://github.com/audiarmadhani/processingfacility-field-app.git
+cd processingfacility-field-app
+cp .env.example .env.local
+npm install && npm run dev
 ```
 
-Then import the repository root on Vercel.
+Import the repository root on Vercel for deployment.
