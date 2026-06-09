@@ -12,6 +12,11 @@ import { apiUrl } from "@/lib/api";
 import type { CheckInRecord, FermentationBatch } from "@/lib/types";
 import { canAccessFermentation } from "@/lib/roles";
 import { loadStoredCheckInPhoto } from "@/lib/check-in-photo";
+import {
+  formatEstimatedFinish,
+  formatLastCheckIn,
+  getLastCheckIn,
+} from "@/lib/fermentation-datetime";
 import { formatTankLabel, periodLabel } from "@/lib/qc";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +36,7 @@ function CheckInPageContent() {
 
   const [batch, setBatch] = useState<FermentationBatch | null>(null);
   const [activePeriod, setActivePeriod] = useState<"morning" | "evening" | null>(periodParam);
-  const [todayCheckIns, setTodayCheckIns] = useState<CheckInRecord[]>([]);
+  const [checkIns, setCheckIns] = useState<CheckInRecord[]>([]);
   const [notes, setNotes] = useState("");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -67,13 +72,7 @@ function CheckInPageContent() {
 
       setBatch(detailsRes.data?.[0] || null);
 
-      const today = dayjs().format("YYYY-MM-DD");
-      setTodayCheckIns(
-        (checkInsRes.data || []).filter(
-          (item) =>
-            item.checkInDate === today || item.checkInDate?.slice?.(0, 10) === today
-        )
-      );
+      setCheckIns(checkInsRes.data || []);
 
       if (!periodParam) {
         const dueForRow = [...(pendingRes.data?.pending || []), ...(pendingRes.data?.overdue || [])].find(
@@ -194,6 +193,12 @@ function CheckInPageContent() {
   }
 
   const hasPhoto = Boolean(selectedFile && previewUrl);
+  const today = dayjs().format("YYYY-MM-DD");
+  const todayCheckIns = checkIns.filter(
+    (item) => item.checkInDate === today || item.checkInDate?.slice?.(0, 10) === today
+  );
+  const lastCheckIn = getLastCheckIn(checkIns);
+  const estimatedFinish = formatEstimatedFinish(batch);
 
   return (
     <div className="space-y-4">
@@ -217,6 +222,21 @@ function CheckInPageContent() {
             <Badge>{periodLabel(activePeriod)}</Badge>
             <span className="text-sm text-stone-500">Tank {formatTankLabel(batch || {})}</span>
           </div>
+
+          <Card>
+            <CardContent className="grid gap-3 p-4 text-sm">
+              <div className="flex items-start justify-between gap-4">
+                <span className="text-stone-500">Est. finish</span>
+                <span className="text-right font-medium text-stone-900">{estimatedFinish}</span>
+              </div>
+              <div className="flex items-start justify-between gap-4">
+                <span className="text-stone-500">Last check-in</span>
+                <span className="text-right font-medium text-stone-900">
+                  {formatLastCheckIn(lastCheckIn)}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
 
           {todayCheckIns.length > 0 ? (
             <Card>

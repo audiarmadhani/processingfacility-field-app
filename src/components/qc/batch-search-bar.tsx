@@ -46,9 +46,13 @@ export function BatchSearchBar({
         autoComplete="off"
         aria-label="Search batches"
       />
-      <Button type="submit" size="lg" className="shrink-0 gap-2 px-4">
+      <Button
+        type="submit"
+        size="icon"
+        className="shrink-0"
+        aria-label="Search"
+      >
         <Search className="h-5 w-5" />
-        Search
       </Button>
     </form>
   );

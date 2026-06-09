@@ -114,10 +114,11 @@ export default function FermentationPage() {
         <p className="mt-1 text-sm text-stone-500">In-progress batches</p>
       </div>
 
-      <div className="-mx-4 overflow-x-auto px-4">
-        <div className="flex w-max max-w-full flex-wrap gap-2 pb-1">
+      <div className="-mx-4 overflow-x-auto px-4 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex w-max flex-nowrap gap-2">
           <Button
             type="button"
+            className="shrink-0 whitespace-nowrap"
             variant={tankFilter === ALL_TANKS_FILTER ? "default" : "outline"}
             onClick={() => setTankFilter(ALL_TANKS_FILTER)}
           >
@@ -126,6 +127,7 @@ export default function FermentationPage() {
           {tankOptions.hasUnassigned ? (
             <Button
               type="button"
+              className="shrink-0 whitespace-nowrap"
               variant={tankFilter === NO_TANK_FILTER ? "default" : "outline"}
               onClick={() => setTankFilter(NO_TANK_FILTER)}
             >
@@ -136,6 +138,7 @@ export default function FermentationPage() {
             <Button
               key={tank}
               type="button"
+              className="shrink-0 whitespace-nowrap"
               variant={tankFilter === tank ? "default" : "outline"}
               onClick={() => setTankFilter(tank)}
             >

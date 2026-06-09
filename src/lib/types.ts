@@ -7,6 +7,11 @@ export type FermentationBatch = {
   tanks?: string[];
   status: string;
   missingPeriod?: "morning" | "evening";
+  fermentationStart?: string | null;
+  startDate?: string | null;
+  fermentationEnd?: string | null;
+  endDate?: string | null;
+  fermentationTimeTarget?: number | string | null;
 };
 
 export type PendingCheckInsResponse = {
