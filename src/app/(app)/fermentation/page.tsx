@@ -9,6 +9,13 @@ import type { FermentationBatch } from "@/lib/types";
 import { canAccessFermentation } from "@/lib/roles";
 import { BatchCard } from "@/components/fermentation/batch-card";
 import { BatchSearchBar } from "@/components/qc/batch-search-bar";
+import { Button } from "@/components/ui/button";
+import {
+  ALL_TANKS_FILTER,
+  NO_TANK_FILTER,
+  batchMatchesTankFilter,
+  collectTankFilterOptions,
+} from "@/lib/fermentation";
 import { matchesPipelineSearch } from "@/lib/qc";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -19,6 +26,7 @@ export default function FermentationPage() {
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
+  const [tankFilter, setTankFilter] = useState(ALL_TANKS_FILTER);
 
   const allowed = canAccessFermentation(session?.user?.role);
 
@@ -62,14 +70,22 @@ export default function FermentationPage() {
     loadBatches();
   }, [allowed, loadBatches, router, status]);
 
+  const tankOptions = useMemo(() => collectTankFilterOptions(batches), [batches]);
+
   const filtered = useMemo(() => {
-    if (!appliedSearch) {
-      return batches;
-    }
     return batches.filter((batch) => {
+      if (!batchMatchesTankFilter(batch, tankFilter)) {
+        return false;
+      }
+
+      if (!appliedSearch) {
+        return true;
+      }
+
       if (!batch.batchNumber) {
         return false;
       }
+
       return (
         matchesPipelineSearch(
           {
@@ -85,7 +101,7 @@ export default function FermentationPage() {
           .includes(appliedSearch.toLowerCase())
       );
     });
-  }, [appliedSearch, batches]);
+  }, [appliedSearch, batches, tankFilter]);
 
   if (!allowed && status !== "loading") {
     return null;
@@ -96,6 +112,37 @@ export default function FermentationPage() {
       <div>
         <h1 className="text-2xl font-bold">Fermentation</h1>
         <p className="mt-1 text-sm text-stone-500">In-progress batches</p>
+      </div>
+
+      <div className="-mx-4 overflow-x-auto px-4">
+        <div className="flex w-max max-w-full flex-wrap gap-2 pb-1">
+          <Button
+            type="button"
+            variant={tankFilter === ALL_TANKS_FILTER ? "default" : "outline"}
+            onClick={() => setTankFilter(ALL_TANKS_FILTER)}
+          >
+            All tanks
+          </Button>
+          {tankOptions.hasUnassigned ? (
+            <Button
+              type="button"
+              variant={tankFilter === NO_TANK_FILTER ? "default" : "outline"}
+              onClick={() => setTankFilter(NO_TANK_FILTER)}
+            >
+              No tank
+            </Button>
+          ) : null}
+          {tankOptions.tanks.map((tank) => (
+            <Button
+              key={tank}
+              type="button"
+              variant={tankFilter === tank ? "default" : "outline"}
+              onClick={() => setTankFilter(tank)}
+            >
+              {tank}
+            </Button>
+          ))}
+        </div>
       </div>
 
       <BatchSearchBar
@@ -114,7 +161,9 @@ export default function FermentationPage() {
         <p className="text-sm text-stone-500">
           {appliedSearch
             ? `No batches match "${appliedSearch}".`
-            : "No in-progress batches found."}
+            : tankFilter !== ALL_TANKS_FILTER
+              ? "No batches match this tank filter."
+              : "No in-progress batches found."}
         </p>
       ) : (
         <div className="space-y-3">
