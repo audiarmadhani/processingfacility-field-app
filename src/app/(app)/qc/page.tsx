@@ -53,7 +53,7 @@ function QcPageContent() {
     return (items: PipelineBatch[]) => {
       if (!q) return items;
       return items.filter((batch) => {
-        const haystack = [batch.batchNumber, batch.processingType, batch.farmerName, batch.lotNumber]
+        const haystack = [batch.batchNumber, batch.processingType, batch.experimentNumber]
           .filter(Boolean)
           .join(" ")
           .toLowerCase();
@@ -77,7 +77,7 @@ function QcPageContent() {
       </div>
 
       <Input
-        placeholder="Search batch, farmer, lot…"
+        placeholder="Search batch, experiment…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />

@@ -21,7 +21,7 @@ export function PipelineCard({ batch, href, mode }: PipelineCardProps) {
               <Badge variant="secondary">{batch.processingType}</Badge>
             </div>
             <p className="mt-1 truncate text-sm text-stone-500">
-              {[batch.farmerName, batch.lotNumber].filter(Boolean).join(" · ") || "—"}
+              {batch.experimentNumber ? `Exp ${batch.experimentNumber}` : "—"}
             </p>
             {mode === "cupping" && batch.cuppingCount != null ? (
               <p className="mt-1 text-xs text-stone-500">{batch.cuppingCount} cupping session(s)</p>
