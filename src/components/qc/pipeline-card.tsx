@@ -3,18 +3,27 @@ import { ChevronRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { PipelineBatch, RoastPipelineBatch } from "@/lib/types";
-import { normalizeRoastCount, resolveCuppingSessionCount } from "@/lib/qc";
+import { type CuppingBatchSummary, summarizeCuppingBatchSummary } from "@/lib/cupping-outcome";
+import { normalizeCuppingCount, normalizeRoastCount } from "@/lib/qc";
+import { CuppingOutcomePills } from "@/components/qc/cupping-outcome-pills";
 
 type PipelineCardProps = {
   batch: PipelineBatch | RoastPipelineBatch;
   href: string;
   mode: "roast" | "cupping";
-  cuppingSessionCounts?: Record<string, number>;
+  cuppingSummaries?: Record<string, CuppingBatchSummary>;
 };
 
-export function PipelineCard({ batch, href, mode, cuppingSessionCounts = {} }: PipelineCardProps) {
+export function PipelineCard({ batch, href, mode, cuppingSummaries = {} }: PipelineCardProps) {
+  const cuppingSummary = cuppingSummaries[batch.batchNumber];
   const cuppingCount =
-    mode === "cupping" ? resolveCuppingSessionCount(batch, cuppingSessionCounts) : 0;
+    mode === "cupping"
+      ? cuppingSummary !== undefined
+        ? normalizeCuppingCount(cuppingSummary.total)
+        : normalizeCuppingCount(batch.cuppingCount)
+      : 0;
+  const outcomeSummary =
+    mode === "cupping" ? summarizeCuppingBatchSummary(cuppingSummary) : [];
   const roastBatch = batch as RoastPipelineBatch;
   const roastCount = normalizeRoastCount(batch.roastCount);
   return (
@@ -36,10 +45,11 @@ export function PipelineCard({ batch, href, mode, cuppingSessionCounts = {} }: P
                   : "Awaiting roast"}
               </p>
             ) : null}
-            {mode === "cupping" ? (
-              <p className="mt-1 text-xs text-stone-500">
-                {cuppingCount} cupping session{cuppingCount === 1 ? "" : "s"}
-              </p>
+            {mode === "cupping" && outcomeSummary.length > 0 ? (
+              <CuppingOutcomePills summary={outcomeSummary} className="mt-2" />
+            ) : null}
+            {mode === "cupping" && cuppingCount === 0 ? (
+              <p className="mt-1 text-xs text-stone-500">No cupping sessions</p>
             ) : null}
           </div>
           <ChevronRight className="h-5 w-5 shrink-0 text-stone-400" />

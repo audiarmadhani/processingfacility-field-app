@@ -7,7 +7,8 @@ import axios from "axios";
 import { apiUrl } from "@/lib/api";
 import type { PipelineBatch, PipelineListsResponse, RoastPipelineBatch } from "@/lib/types";
 import { canAccessQc } from "@/lib/roles";
-import { loadCuppingSessionCounts } from "@/lib/cupping-counts";
+import { cuppingSummariesToSessionCounts, loadCuppingSummaries } from "@/lib/cupping-counts";
+import type { CuppingBatchSummary } from "@/lib/cupping-outcome";
 import {
   type CuppingSessionFilter,
   type RoastPipelineFilter,
@@ -45,7 +46,7 @@ function QcPageContent() {
   const [tab, setTab] = useState(tabFromUrl);
   const [roastingBatches, setRoastingBatches] = useState<RoastPipelineBatch[]>([]);
   const [cuppingBatches, setCuppingBatches] = useState<PipelineBatch[]>([]);
-  const [cuppingSessionCounts, setCuppingSessionCounts] = useState<Record<string, number>>({});
+  const [cuppingSummaries, setCuppingSummaries] = useState<Record<string, CuppingBatchSummary>>({});
   const [loading, setLoading] = useState(true);
   const [loadingCuppingCounts, setLoadingCuppingCounts] = useState(false);
   const [searchInput, setSearchInput] = useState("");
@@ -65,12 +66,12 @@ function QcPageContent() {
       setCuppingBatches(roasted);
 
       setLoadingCuppingCounts(true);
-      const counts = await loadCuppingSessionCounts(roasted.map((batch) => batch.batchNumber));
-      setCuppingSessionCounts(counts);
+      const summaries = await loadCuppingSummaries(roasted.map((batch) => batch.batchNumber));
+      setCuppingSummaries(summaries);
     } catch {
       setRoastingBatches([]);
       setCuppingBatches([]);
-      setCuppingSessionCounts({});
+      setCuppingSummaries({});
     } finally {
       setLoading(false);
       setLoadingCuppingCounts(false);
@@ -108,6 +109,11 @@ function QcPageContent() {
     const byRoastStatus = filterRoastPipelineBatches(sorted, roastPipelineFilter);
     return filterBySearch(byRoastStatus);
   }, [filterBySearch, roastPipelineFilter, roastingBatches]);
+
+  const cuppingSessionCounts = useMemo(
+    () => cuppingSummariesToSessionCounts(cuppingSummaries),
+    [cuppingSummaries]
+  );
 
   const filteredCupping = useMemo(() => {
     const sorted = sortPipelineByBatchNumber(cuppingBatches);
@@ -199,7 +205,7 @@ function QcPageContent() {
           </div>
 
           {loadingCuppingCounts ? (
-            <p className="text-sm text-stone-500">Refreshing cupping session counts…</p>
+            <p className="text-sm text-stone-500">Refreshing cupping summaries…</p>
           ) : null}
 
           {loading ? (
@@ -221,7 +227,7 @@ function QcPageContent() {
                 key={`${batch.batchNumber}-${batch.processingType}`}
                 batch={batch}
                 mode="cupping"
-                cuppingSessionCounts={cuppingSessionCounts}
+                cuppingSummaries={cuppingSummaries}
                 href={`/qc/cupping/${encodeURIComponent(batch.batchNumber)}?processingType=${encodeURIComponent(batch.processingType)}`}
               />
             ))

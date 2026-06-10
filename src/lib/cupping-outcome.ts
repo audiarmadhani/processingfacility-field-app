@@ -46,3 +46,37 @@ export function isValidCuppingOutcome(value: string | null | undefined): value i
 export function getCuppingOutcomeMeta(value: string | null | undefined) {
   return CUPPING_OUTCOMES.find((o) => o.value === value);
 }
+
+export type CuppingOutcomeCount = { value: CuppingOutcomeValue; count: number };
+
+export type CuppingBatchSummary = {
+  total: number;
+  outcomes: Partial<Record<CuppingOutcomeValue, number>>;
+};
+
+export function summarizeCuppingOutcomes(
+  entries: { cuppingOutcome?: string | null }[]
+): CuppingOutcomeCount[] {
+  const counts = new Map<CuppingOutcomeValue, number>();
+
+  for (const entry of entries) {
+    if (!isValidCuppingOutcome(entry.cuppingOutcome)) continue;
+    counts.set(entry.cuppingOutcome, (counts.get(entry.cuppingOutcome) ?? 0) + 1);
+  }
+
+  return CUPPING_OUTCOMES.filter((outcome) => counts.has(outcome.value)).map((outcome) => ({
+    value: outcome.value,
+    count: counts.get(outcome.value) ?? 0,
+  }));
+}
+
+export function summarizeCuppingBatchSummary(summary: CuppingBatchSummary | undefined): CuppingOutcomeCount[] {
+  if (!summary?.outcomes) return [];
+
+  return CUPPING_OUTCOMES.filter((outcome) => (summary.outcomes[outcome.value] ?? 0) > 0).map(
+    (outcome) => ({
+      value: outcome.value,
+      count: summary.outcomes[outcome.value] ?? 0,
+    })
+  );
+}

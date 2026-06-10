@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
@@ -16,9 +16,10 @@ import {
   isCuppingEntryComplete,
   mapCuppingEntry,
 } from "@/lib/qc";
-import { CUPPING_OUTCOMES, getCuppingOutcomeMeta } from "@/lib/cupping-outcome";
+import { CUPPING_OUTCOMES, getCuppingOutcomeMeta, summarizeCuppingOutcomes } from "@/lib/cupping-outcome";
 import { loadQcBatchContext, type QcBatchContext } from "@/lib/qc-batch-context";
 import { BatchContextCard } from "@/components/qc/batch-context-card";
+import { CuppingOutcomePills } from "@/components/qc/cupping-outcome-pills";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,6 +49,7 @@ function CuppingPageContent() {
   const [showForm, setShowForm] = useState(false);
 
   const allowed = canAccessQc(session?.user?.role);
+  const outcomeSummary = useMemo(() => summarizeCuppingOutcomes(entries), [entries]);
 
   const loadEntries = useCallback(async () => {
     try {
@@ -178,6 +180,9 @@ function CuppingPageContent() {
           <p className="text-sm text-stone-500">
             {batchNumber} · {processingType}
           </p>
+          {!loading && outcomeSummary.length > 0 ? (
+            <CuppingOutcomePills summary={outcomeSummary} className="mt-2" />
+          ) : null}
         </div>
       </div>
 
