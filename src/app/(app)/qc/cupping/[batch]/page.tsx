@@ -16,6 +16,8 @@ import {
   isCuppingEntryComplete,
   mapCuppingEntry,
 } from "@/lib/qc";
+import { loadQcBatchContext, type QcBatchContext } from "@/lib/qc-batch-context";
+import { BatchContextCard } from "@/components/qc/batch-context-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,6 +38,8 @@ function CuppingPageContent() {
   const processingType = searchParams.get("processingType") || "";
 
   const [entries, setEntries] = useState<CuppingEntry[]>([]);
+  const [batchContext, setBatchContext] = useState<QcBatchContext | null>(null);
+  const [loadingContext, setLoadingContext] = useState(true);
   const [draft, setDraft] = useState<CuppingDraft>(emptyCuppingDraft());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -54,6 +58,18 @@ function CuppingPageContent() {
     }
   }, [batchNumber]);
 
+  const loadBatchContext = useCallback(async () => {
+    if (!batchNumber) return;
+    setLoadingContext(true);
+    try {
+      setBatchContext(await loadQcBatchContext(batchNumber));
+    } catch {
+      setBatchContext(null);
+    } finally {
+      setLoadingContext(false);
+    }
+  }, [batchNumber]);
+
   useEffect(() => {
     if (status === "loading") return;
     if (!allowed) {
@@ -66,7 +82,8 @@ function CuppingPageContent() {
       return;
     }
     loadEntries();
-  }, [allowed, loadEntries, processingType, router, status]);
+    loadBatchContext();
+  }, [allowed, loadBatchContext, loadEntries, processingType, router, status]);
 
   const resetDraft = () => {
     setDraft(emptyCuppingDraft());
@@ -161,6 +178,8 @@ function CuppingPageContent() {
           </p>
         </div>
       </div>
+
+      <BatchContextCard context={batchContext} loading={loadingContext} />
 
       {loading ? (
         <Skeleton className="h-24 w-full" />

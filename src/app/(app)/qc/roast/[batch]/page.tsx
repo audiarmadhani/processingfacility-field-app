@@ -10,7 +10,9 @@ import { ArrowLeft } from "lucide-react";
 import { apiUrl } from "@/lib/api";
 import type { RoastRecord } from "@/lib/types";
 import { canAccessQc } from "@/lib/roles";
+import { loadQcBatchContext, type QcBatchContext } from "@/lib/qc-batch-context";
 import { toDatetimeLocalValue } from "@/lib/qc";
+import { BatchContextCard } from "@/components/qc/batch-context-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +30,8 @@ function RecordRoastPageContent() {
   const processingType = searchParams.get("processingType") || "";
 
   const [roastHistory, setRoastHistory] = useState<RoastRecord[]>([]);
+  const [batchContext, setBatchContext] = useState<QcBatchContext | null>(null);
+  const [loadingContext, setLoadingContext] = useState(true);
   const [roastedAt, setRoastedAt] = useState(toDatetimeLocalValue());
   const [roastProfile, setRoastProfile] = useState("");
   const [endTemp, setEndTemp] = useState("");
@@ -53,6 +57,18 @@ function RecordRoastPageContent() {
     }
   }, [batchNumber, processingType]);
 
+  const loadBatchContext = useCallback(async () => {
+    if (!batchNumber) return;
+    setLoadingContext(true);
+    try {
+      setBatchContext(await loadQcBatchContext(batchNumber));
+    } catch {
+      setBatchContext(null);
+    } finally {
+      setLoadingContext(false);
+    }
+  }, [batchNumber]);
+
   useEffect(() => {
     if (status === "loading") return;
     if (!allowed) {
@@ -65,7 +81,8 @@ function RecordRoastPageContent() {
       return;
     }
     loadHistory();
-  }, [allowed, loadHistory, processingType, router, status]);
+    loadBatchContext();
+  }, [allowed, loadBatchContext, loadHistory, processingType, router, status]);
 
   const canSave =
     roastedAt &&
@@ -127,6 +144,8 @@ function RecordRoastPageContent() {
           </p>
         </div>
       </div>
+
+      <BatchContextCard context={batchContext} loading={loadingContext} />
 
       <div className="space-y-4">
         <div className="space-y-2">
