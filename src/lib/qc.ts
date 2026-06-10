@@ -1,4 +1,5 @@
-import type { CuppingEntry, PipelineBatch, RoastPipelineBatch } from "@/lib/types";
+import type { CuppingEntry, CuppingOutcome, PipelineBatch, RoastPipelineBatch } from "@/lib/types";
+import { isValidCuppingOutcome } from "@/lib/cupping-outcome";
 
 export type CuppingSessionFilter = "all" | "no_sessions" | "has_sessions";
 export type RoastPipelineFilter = "all" | "awaiting" | "roasted";
@@ -13,7 +14,7 @@ export function emptyCuppingDraft() {
   return {
     cuppedAt: new Date().toISOString().slice(0, 10),
     notes: "",
-    okForFurtherProcess: null as boolean | null,
+    cuppingOutcome: null as CuppingOutcome | null,
     editingIndex: null as number | null,
   };
 }
@@ -22,14 +23,24 @@ export function mapCuppingEntry(entry: {
   id?: number | null;
   cuppedAt?: string | null;
   notes?: string | null;
+  cuppingOutcome?: CuppingOutcome | null;
   okForFurtherProcess?: boolean | null;
   cuppedBy?: string | null;
 }): CuppingEntry {
+  let cuppingOutcome: CuppingOutcome | null = null;
+  if (isValidCuppingOutcome(entry.cuppingOutcome)) {
+    cuppingOutcome = entry.cuppingOutcome;
+  } else if (entry.okForFurtherProcess === true) {
+    cuppingOutcome = "Good";
+  } else if (entry.okForFurtherProcess === false) {
+    cuppingOutcome = "Not Good";
+  }
+
   return {
     id: entry.id,
     cuppedAt: entry.cuppedAt ? String(entry.cuppedAt).slice(0, 10) : "",
     notes: entry.notes || "",
-    okForFurtherProcess: entry.okForFurtherProcess ?? null,
+    cuppingOutcome,
     cuppedBy: entry.cuppedBy || null,
   };
 }
@@ -37,13 +48,13 @@ export function mapCuppingEntry(entry: {
 export function isCuppingEntryComplete(entry: {
   cuppedAt?: string;
   notes?: string;
-  okForFurtherProcess?: boolean | null;
+  cuppingOutcome?: CuppingOutcome | null;
 }) {
   return (
     !!entry.cuppedAt &&
     typeof entry.notes === "string" &&
     entry.notes.trim() !== "" &&
-    entry.okForFurtherProcess !== null
+    isValidCuppingOutcome(entry.cuppingOutcome)
   );
 }
 
@@ -83,7 +94,7 @@ export function buildCuppingOnlyPayload(
       id: entry.id,
       cuppedAt: entry.cuppedAt,
       notes: entry.notes.trim(),
-      okForFurtherProcess: entry.okForFurtherProcess,
+      cuppingOutcome: entry.cuppingOutcome,
     })),
     cuppedBy,
     isCompleted,

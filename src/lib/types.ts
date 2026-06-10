@@ -68,12 +68,15 @@ export type RoastRecord = {
   roastProfile?: string | null;
   endTemp?: number | null;
   firstCrackMinutes?: number | null;
+  firstCrackTemp?: number | null;
 };
+
+export type CuppingOutcome = "Production" | "Good" | "Redo" | "Not Good";
 
 export type CuppingEntry = {
   id?: number | null;
   cuppedAt: string;
   notes: string;
-  okForFurtherProcess: boolean | null;
+  cuppingOutcome: CuppingOutcome | null;
   cuppedBy?: string | null;
 };

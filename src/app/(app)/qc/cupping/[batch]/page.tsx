@@ -8,7 +8,7 @@ import axios from "axios";
 import { toast } from "sonner";
 import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import { apiUrl } from "@/lib/api";
-import type { CuppingEntry } from "@/lib/types";
+import type { CuppingEntry, CuppingOutcome } from "@/lib/types";
 import { canAccessQc } from "@/lib/roles";
 import {
   buildCuppingOnlyPayload,
@@ -16,6 +16,7 @@ import {
   isCuppingEntryComplete,
   mapCuppingEntry,
 } from "@/lib/qc";
+import { CUPPING_OUTCOMES, getCuppingOutcomeMeta } from "@/lib/cupping-outcome";
 import { loadQcBatchContext, type QcBatchContext } from "@/lib/qc-batch-context";
 import { BatchContextCard } from "@/components/qc/batch-context-card";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 type CuppingDraft = ReturnType<typeof emptyCuppingDraft>;
 
@@ -92,7 +94,7 @@ function CuppingPageContent() {
 
   const handleAddOrUpdate = () => {
     if (!isCuppingEntryComplete(draft)) {
-      toast.error("Complete date, notes, and OK / Not OK before adding.");
+      toast.error("Complete date, notes, and outcome before adding.");
       return;
     }
 
@@ -100,7 +102,7 @@ function CuppingPageContent() {
       id: draft.editingIndex != null ? entries[draft.editingIndex]?.id : null,
       cuppedAt: draft.cuppedAt,
       notes: draft.notes.trim(),
-      okForFurtherProcess: draft.okForFurtherProcess,
+      cuppingOutcome: draft.cuppingOutcome as CuppingOutcome,
       cuppedBy: session?.user?.name || session?.user?.email || null,
     };
 
@@ -120,7 +122,7 @@ function CuppingPageContent() {
     setDraft({
       cuppedAt: entry.cuppedAt,
       notes: entry.notes,
-      okForFurtherProcess: entry.okForFurtherProcess,
+      cuppingOutcome: entry.cuppingOutcome,
       editingIndex: index,
     });
     setShowForm(true);
@@ -187,29 +189,32 @@ function CuppingPageContent() {
         <p className="text-sm text-stone-500">No cupping sessions yet.</p>
       ) : (
         <div className="space-y-2">
-          {entries.map((entry, index) => (
-            <Card key={`${entry.id ?? "new"}-${index}`}>
-              <CardContent className="flex items-start justify-between gap-3 p-4">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold">{entry.cuppedAt}</p>
-                    <Badge variant={entry.okForFurtherProcess ? "default" : "destructive"}>
-                      {entry.okForFurtherProcess ? "OK" : "Not OK"}
-                    </Badge>
+          {entries.map((entry, index) => {
+            const outcomeMeta = getCuppingOutcomeMeta(entry.cuppingOutcome);
+            return (
+              <Card key={`${entry.id ?? "new"}-${index}`}>
+                <CardContent className="flex items-start justify-between gap-3 p-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold">{entry.cuppedAt}</p>
+                      {outcomeMeta ? (
+                        <Badge className={outcomeMeta.badgeClass}>{outcomeMeta.label}</Badge>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 text-sm text-stone-600">{entry.notes}</p>
                   </div>
-                  <p className="mt-1 text-sm text-stone-600">{entry.notes}</p>
-                </div>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" onClick={() => handleEdit(index)} aria-label="Edit">
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => handleRemove(index)} aria-label="Remove">
-                    <Trash2 className="h-4 w-4 text-red-600" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => handleEdit(index)} aria-label="Edit">
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleRemove(index)} aria-label="Remove">
+                      <Trash2 className="h-4 w-4 text-red-600" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
@@ -236,24 +241,26 @@ function CuppingPageContent() {
               />
             </div>
             <div className="space-y-2">
-              <Label>OK for further process?</Label>
+              <Label>Outcome</Label>
               <div className="grid grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  variant={draft.okForFurtherProcess === true ? "default" : "outline"}
-                  size="lg"
-                  onClick={() => setDraft((prev) => ({ ...prev, okForFurtherProcess: true }))}
-                >
-                  OK
-                </Button>
-                <Button
-                  type="button"
-                  variant={draft.okForFurtherProcess === false ? "destructive" : "outline"}
-                  size="lg"
-                  onClick={() => setDraft((prev) => ({ ...prev, okForFurtherProcess: false }))}
-                >
-                  Not OK
-                </Button>
+                {CUPPING_OUTCOMES.map((outcome) => (
+                  <Button
+                    key={outcome.value}
+                    type="button"
+                    size="lg"
+                    className={cn(
+                      draft.cuppingOutcome === outcome.value
+                        ? outcome.selectedButtonClass
+                        : outcome.buttonClass
+                    )}
+                    variant={draft.cuppingOutcome === outcome.value ? "default" : "outline"}
+                    onClick={() =>
+                      setDraft((prev) => ({ ...prev, cuppingOutcome: outcome.value }))
+                    }
+                  >
+                    {outcome.label}
+                  </Button>
+                ))}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">

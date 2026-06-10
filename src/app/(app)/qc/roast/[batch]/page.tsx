@@ -36,6 +36,7 @@ function RecordRoastPageContent() {
   const [roastProfile, setRoastProfile] = useState("");
   const [endTemp, setEndTemp] = useState("");
   const [firstCrackMinutes, setFirstCrackMinutes] = useState("");
+  const [firstCrackTemp, setFirstCrackTemp] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -103,6 +104,10 @@ function RecordRoastPageContent() {
         roastProfile: roastProfile.trim(),
         endTemp: parseFloat(endTemp),
         firstCrackMinutes: parseFloat(firstCrackMinutes),
+        firstCrackTemp:
+          firstCrackTemp !== "" && !Number.isNaN(parseFloat(firstCrackTemp))
+            ? parseFloat(firstCrackTemp)
+            : null,
         notes: notes.trim() || null,
         roastedBy: session?.user?.name || session?.user?.email || "unknown",
       });
@@ -111,6 +116,7 @@ function RecordRoastPageContent() {
       setRoastProfile("");
       setEndTemp("");
       setFirstCrackMinutes("");
+      setFirstCrackTemp("");
       setNotes("");
       await loadHistory();
       router.push("/qc?tab=roast");
@@ -189,6 +195,16 @@ function RecordRoastPageContent() {
               onChange={(e) => setFirstCrackMinutes(e.target.value)}
             />
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="firstCrackTemp">1st crack temp (°C, optional)</Label>
+            <Input
+              id="firstCrackTemp"
+              type="number"
+              inputMode="decimal"
+              value={firstCrackTemp}
+              onChange={(e) => setFirstCrackTemp(e.target.value)}
+            />
+          </div>
         </div>
 
         <div className="space-y-2">
@@ -222,6 +238,7 @@ function RecordRoastPageContent() {
                   <CardContent className="p-4 text-sm">
                     <p className="font-semibold">
                       {row.roastProfile || "—"} · {row.endTemp ?? "—"}°C · {row.firstCrackMinutes ?? "—"} min
+                      {row.firstCrackTemp != null ? ` · ${row.firstCrackTemp}°C FC` : ""}
                     </p>
                     <p className="text-stone-500">
                       {row.roastedAt ? new Date(row.roastedAt).toLocaleString() : "—"}
